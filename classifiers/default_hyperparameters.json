@@ -1,0 +1,13 @@
+{
+    "classifier_name": "fcn",
+    "num_classes": 2,
+    "monitor": "loss",
+    "loss": "categorical_crossentropy",
+    "optimizer": "adam",
+    "epochs": 200,
+    "batch_size": 32,
+    "learning_rate": 1e-3,
+    "reduce_lr_factor": 0.5,
+    "reduce_lr_patience": 50,
+    "min_lr": 0.0001
+}
