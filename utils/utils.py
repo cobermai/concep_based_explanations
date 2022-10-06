@@ -2,6 +2,8 @@ import math
 from itertools import chain, combinations
 from pathlib import Path
 import numpy as np
+from sklearn.manifold.t_sne import _joint_probabilities
+from sklearn.metrics import pairwise_distances
 
 class ConceptProperties:
 
@@ -90,3 +92,44 @@ class ConceptProperties:
         s = list(iterable)
         pset = chain.from_iterable(combinations(s, r) for r in range(0, len(s) + 1))
         return [list(i) for i in list(pset)]
+
+    @staticmethod
+    def KL_divergence_performance(X, latent):
+        perplexity = 30
+
+        distances = pairwise_distances(X, metric='euclidean', squared=True)
+        P = _joint_probabilities(distances=distances, desired_perplexity=perplexity, verbose=False)
+
+        distances_latent = pairwise_distances(latent, metric='euclidean', squared=True)
+        Q = _joint_probabilities(distances=distances_latent, desired_perplexity=perplexity, verbose=False)
+
+        kl_divergence = 2.0 * np.dot(P, np.log(np.maximum(P, 1e-10) / Q))
+        return kl_divergence
+
+    @staticmethod
+    def get_closest_rec_concept_to_instance_msp(X, l_all, l_concept):
+        """
+        X: input data
+        l_all: latent activations of input
+        l_concept: latent activation of concepts
+        """
+        instance_concept = np.zeros_like(X)
+        for i, instance in enumerate(l_all):
+            distance = np.linalg.norm(instance - l_concept, axis=-1)
+            distance_min_index = np.argsort(distance)[-1:]
+            instance_concept[i] = X[distance_min_index]
+        return instance_concept
+
+    @staticmethod
+    def get_closest_rec_concept_to_instance(X, l_all, l_concept):
+        """
+        X: input data
+        l_all: latent activations of input
+        l_concept: latent activation of concepts
+        """
+        instance_concept = np.zeros_like(X)
+        for i, instance in enumerate(l_all):
+            distance = np.linalg.norm(instance - l_concept, axis=-1)
+            distance_min_index = np.argsort(distance)[:1]
+            instance_concept[i] = X[distance_min_index]#
+        return instance_concept

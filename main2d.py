@@ -99,27 +99,6 @@ def main(
         "concepts_kmeans.png",
         labels=labels)
 
-    # completeness & importance
-    y_pred = model(test.X)
-    y_pred_reconstructed = model(exp.explainer(test.X))
-
-    cp = ConceptProperties()
-    completness = cp.get_completness(y_pred, y_pred_reconstructed)
-    conceptSHAP = cp.get_concept_shap(
-        predictor=model,
-        decoder=exp.explainer.decoder,
-        latent=exp.explainer.encoder(
-            test.X).numpy(),
-        concepts=latent_concepts,
-        y_pred=y_pred)
-    pd.DataFrame({
-        "model": "MAP",
-        "completness": completness,
-        "conceptSHAP": [conceptSHAP],
-        "latent_centers": [latent_concepts]
-    }, index=[0]) \
-        .to_csv(output_dir_ex / "completeness_importance_concept.csv")
-
 
 if __name__ == '__main__':
     # Set parameter grid

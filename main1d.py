@@ -95,23 +95,16 @@ def get_ebe_explanations(
     concepts = feature_model(X_examples)
 
     y_pred = model(test.X)
-    instance_concept = cp.get_closest_concept_to_instances(
-        latent.numpy(), concepts.numpy())
-    y_pred_reconstructed = pred_model(instance_concept)
+    instance_concept = cp.get_closest_rec_concept_to_instance(test.X, latent.numpy(), concepts.numpy())
 
-    completness = cp.get_completness(y_pred, y_pred_reconstructed)
-    conceptSHAP = cp.get_concept_shap(predictor=pred_model,
-                                      decoder=None,
-                                      latent=latent.numpy(),
-                                      concepts=concepts.numpy(),
-                                      y_pred=y_pred.numpy())
     pd.DataFrame({
         "model": "EBE",
         "accuracy": cp.get_completness(test.y, y_pred),
         "output_dir": output_dir,
         "n_concepts": n_concepts,
-        "completness": completness,
-        "conceptSHAP": [conceptSHAP],
+        "concept representability": cp.KL_divergence_performance(test.X[:, :, 0], latent), #
+        "reconstructed concept representability": cp.KL_divergence_performance(test.X[:, :, 0],
+                                                                               instance_concept[:, :, 0])
     }, index=[0]) \
         .to_csv(output_dir / "completeness_importance_ebe.csv")
 
@@ -160,23 +153,18 @@ def get_msp_explanations(
     cp = ConceptProperties()
     latent = pexp.explainer.encoder(test.X)
     y_pred = pexp.explainer.predictor(latent)
-    instance_concept = cp.get_closest_concept_to_instances(
-        latent.numpy(), prototypes.numpy())
-    y_pred_reconstructed = pexp.explainer.predictor(instance_concept)
 
-    completness = cp.get_completness(y_pred, y_pred_reconstructed)
-    conceptSHAP = cp.get_concept_shap(predictor=pexp.explainer.predictor,
-                                      decoder=None,  # latent space needs no decoding before prediction
-                                      latent=latent.numpy(),
-                                      concepts=prototypes.numpy(),
-                                      y_pred=y_pred)
+    msp_proto = pexp.explainer.predictor.prototypes
+    concept_close_to_activation = cp.get_closest_rec_concept_to_instance_msp(test.X, latent, msp_proto)
+
     pd.DataFrame({
         "model": "MSP",
         "accuracy": cp.get_completness(test.y, y_pred),
         "n_concepts": n_concepts,
         "output_dir": output_dir,
-        "completness": completness,
-        "conceptSHAP": [conceptSHAP],
+        "concept representability": cp.KL_divergence_performance(test.X[:, :, 0], latent),
+        "reconstructed concept representability": cp.KL_divergence_performance(test.X[:, :, 0],
+                                                                               concept_close_to_activation[:, :, 0]),
         "latent_centers": [prototypes.numpy()]
     }, index=[0]) \
         .to_csv(output_dir / "completeness_importance_msp.csv")
@@ -223,6 +211,7 @@ def get_map_explanations(
 
     X_concepts_kmeans, latent_centers = exp.get_concepts_kmeans(train.X)
     concept_labels = model(X_concepts_kmeans)
+    latent = exp.explainer.encoder(test.X)
     viszualization.plot_concepts_by_label(
         X_concepts_kmeans,
         output_dir_ex / "map.png",
@@ -230,25 +219,18 @@ def get_map_explanations(
 
     # completeness & importance
     y_pred = model(test.X)
-    y_pred_reconstructed = model(exp.explainer(test.X))
 
     cp = ConceptProperties()
-    completness = cp.get_completness(y_pred, y_pred_reconstructed)
-    conceptSHAP = cp.get_concept_shap(
-        predictor=model,
-        decoder=exp.explainer.decoder,
-        latent=exp.explainer.encoder(
-            test.X).numpy(),
-        concepts=latent_centers,
-        y_pred=y_pred)
+    map_instance_concept = cp.get_closest_rec_concept_to_instance(test.X, latent.numpy(), latent_centers)
 
     pd.DataFrame({
         "model": "MAP",
         "accuracy": cp.get_completness(test.y, y_pred),
         "output_dir": output_dir,
         "n_concepts": n_concepts,
-        "completness": completness,
-        "conceptSHAP": [conceptSHAP],
+        "concept representability": cp.KL_divergence_performance(test.X[:, :, 0], latent),
+        "reconstructed concept representability": cp.KL_divergence_performance(test.X[:, :, 0],
+                                                                               map_instance_concept[:, :, 0]),
         "latent_centers": [latent_centers]
     }, index=[0]) \
         .to_csv(output_dir / "completeness_importance_concept_map.csv")
@@ -263,7 +245,7 @@ if __name__ == '__main__':
     param_grid = {
         "datasets": datasets,
         "explainer_names": explainer_names,
-        "n_concepts": [2, 3, 4, 5, 6, 7, 8]
+        "n_concepts": [4]
     }
     vary_values = list(map(param_grid.get, param_grid.keys()))
     meshgrid = np.array(np.meshgrid(*vary_values)
